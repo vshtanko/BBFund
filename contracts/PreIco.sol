@@ -1,12 +1,8 @@
-pragma solidity ^0.4.4;
+pragma solidity ^0.4.8;
 
-//TODO global 0 - correct token buyout
-//TODO global 1 - access rights to functions, after ICO, pausing
-//TODO global 2 - multisig
-//TODO global 3 - time-bound stop
+import "./MultiSig.sol";
 
-
-contract PreIco {
+contract PreIco is MultiSigWallet {
 
     mapping (address => uint) balances;
     uint currentTokenSupply = 2500;
@@ -32,10 +28,10 @@ contract PreIco {
     //Functions
 
     function() payable {
-        throw;
+        revert();
     }
 
-    function PreIco() {
+    function PreIco(address[] _owners, uint _required) payable {
         timeCreated = getTime();
     }
 
@@ -62,11 +58,11 @@ contract PreIco {
             TokensBought(msg.sender, buyAmount);
         }
         else {
-            balances[msg.sender] += currentTokenSupply;
-            currentTokenSupply = 0;
-            TokensBought(msg.sender, currentTokenSupply);
             isStopped = true;
+            balances[msg.sender] += currentTokenSupply;
+            TokensBought(msg.sender, currentTokenSupply);
             uint weiValueReturnExcess = (buyAmount - currentTokenSupply) * priceInWei;
+            currentTokenSupply = 0;
             msg.sender.transfer(weiValueReturnExcess);
             ReturnExcess(msg.sender, weiValueReturnExcess);
 
