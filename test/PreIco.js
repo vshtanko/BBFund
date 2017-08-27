@@ -4,11 +4,10 @@ var accounts = web3.eth.accounts;
 contract("PreIco test", function(accounts) {
 
 
-	it("should have a starting supply of 2500", function() {
-		var ico;
+	it("should have buy logic", function() {
 		return PreIco.deployed().then(function (instance) {
 			ico = instance;
-			return ico.getCurrentTokenSupply.call(accounts[0]);
+			return ico.currentTokenSupply.call(accounts[0]);
         }).then(function(supply) {
             assert.equal(supply.valueOf(), 2500, "Supply isn't 2500!");
         });
@@ -21,51 +20,112 @@ contract("PreIco test", function(accounts) {
             return ico.buyTokens(
             {from:accounts[1], to:ico.address, value: web3.toWei(1, "ether")})
         }).then(function(afterSending) {
-            return ico.getCurrentTokenSupply.call();
+            return ico.currentTokenSupply.call();
         }).then(function(supply) {
             assert.equal(supply.valueOf(), 2499, "Supply after buy isn't 2499!");
-            return ico.getBalance.call({from: accounts[1]});
+            return ico.balances.call(accounts[1]);
         }).then(function(buyer1Balance) {
                     assert.equal(buyer1Balance.valueOf(), 1, "Amount after buy is not 1!");
         });
     });
 
-	it("should have correct buy amount if buys more than supply", function() {
-    		var ico;
+	it("should have correct logic on overbuy", function() {
     		return PreIco.deployed().then(function (instance) {
     			ico = instance;
-    		return ico.getCurrentTokenSupply.call(accounts[0]);
+    		return ico.currentTokenSupply.call(accounts[0]);
     	}).then(function(preBuyBalance) {
-    	    return ico.getCurrentTokenSupply.call();
+    	    return ico.currentTokenSupply.call();
     	}).then(function(preBuyBalance) {
-    	    assert.equal(preBuyBalance.valueOf(), 2499, "Supply after buy isn't 2000!");
+    	    assert.equal(preBuyBalance.valueOf(), 2499, "Supply after buy isn't 2499!");
     		return ico.buyTokens(
     		{from:accounts[2], to:ico.address, value: web3.toWei(3000, "ether")})
     	}).then(function(afterSending) {
-    		return ico.getCurrentTokenSupply.call();
+    		return ico.currentTokenSupply.call();
     	}).then(function(supply) {
     	    assert.equal(supply.valueOf(), 0, "Supply after buy isn't 0!");
-    	    return ico.getBalance.call({from: accounts[2]});
+    	    return ico.balances.call(accounts[2]);
         }).then(function(buyer1Balance) {
-            assert.equal(buyer1Balance.valueOf(), 2499, "Amount after buy is not 2500!");
-            return web3.eth.getBalance(accounts[2]);
-        }).then(function(balanceAfter) {
-            assert.isBelow((7501*10**18 - balanceAfter.valueOf())/10**15, 500, "Balance after refund is wrong! (up)")
-            assert.isBelow((balanceAfter.valueOf() - 7501*10**18)/10**15, 500, "Balance after refund is wrong! (down)")
-    	});
+            assert.equal(buyer1Balance.valueOf(), 2499, "Balance after overbuy is not correct!");
+            return ico.excessRefundee.call();
+        }).then(function(excessRefundee) {
+            assert.equal(excessRefundee.valueOf(), accounts[2], "Wrong refundee address!");
+            return ico.excessRefundeeAmount.call();
+        }).then(function(excessRefundeeAmount) {
+            assert.equal(excessRefundeeAmount.valueOf(), web3.toWei(3000-2499, "ether"), "Excess refund amount incorrect");
+        });
     });
 
-    it("should have correct inTime() function", function() {
-        		var ico;
-        		return PreIco.deployed().then(function (instance) {
-        			ico = instance;
-        		return ico.getCurrentTokenSupply.call(accounts[0]);
-        	}).then(function(preBuyBalance) {
-        	    return ico.inTime.call();
-        	}).then(function(timeTrue) {
-        	    assert.equal(timeTrue.valueOf(), true, "Time isn't correct!");
+    it("should have correct logic on admin pause/run", function() {
+            return PreIco.deployed().then(function (instance) {
+                ico = instance;
+            return ico.pause();
+        }).then(function(_) {
+            return ico.isStopped();
+        }).then(function(isStopped) {
+            assert.equal(isStopped.valueOf(), true, "Doesn't pause correctly");
+            return ico.buyTokens(
+                {from:accounts[1], to:ico.address, value: web3.toWei(1, "ether")})
+        }).then(assert.fail)
+            .catch(function(error) {
+            return ico.run();
+        }).then(function(_) {
+            return ico.isStopped();
+        }).then(function(isStopped) {
+            assert.equal(isStopped.valueOf(), false, "Doesn't run correctly");
+            return ico.pause({from: accounts[1]});
+        }).then(assert.fail)
+        .catch(function(error) {
+            return ico.isStopped();
+        }).then(function(isStopped) {
+            assert.equal(isStopped.valueOf(), false, "Admin rights compromised");
+        });
     });
+
+
+    it("should have correct logic on refundExcess", function() {
+        return PreIco.deployed().then(function (instance) {
+            ico = instance;
+        return ico.refundExcess({from: accounts[0]});
+    }).then(function(_) {
+        return web3.eth.getBalance(web3.eth.accounts[2]);
+    }).then(function(balanceAfter) {
+        assert.isBelow((7501*10**18 - balanceAfter.valueOf())/10**15, 500, "Balance after refund is wrong! (up)")
+        assert.isBelow((balanceAfter.valueOf() - 7501*10**18)/10**15, 500, "Balance after refund is wrong! (down)")
     });
+});
+
+    it("should have correct logic on refund", function() {
+            return PreIco.deployed().then(function (instance) {
+                ico = instance;
+            return ico.refund(accounts[1]);
+        }).then(function(_) {
+            return ico.balances(accounts[1]);
+        }).then(function(buyer1Balance) {
+           assert.equal(buyer1Balance.valueOf(), 0, "Amount after refund  is not 0!");
+            return web3.eth.getBalance(web3.eth.accounts[1]);
+        }).then(function(balanceAfter) {
+            assert.isBelow((9999*10**18 - balanceAfter.valueOf())/10**15, 500, "Balance after refund is wrong! (up)")
+            //assert.isBelow((balanceAfter.valueOf()), 500, "Balance after refund is wrong! (up)")
+            assert.isBelow((balanceAfter.valueOf() - 9999*10**18)/10**15, 500, "Balance after refund is wrong! (down)")
+        });
+    });
+
+    it("should have correct logic on fund transfer", function() {
+            return PreIco.deployed().then(function (instance) {
+                ico = instance;
+            return ico.wallet.call();
+        }).then(function(wallet) {
+            assert.equal(wallet.valueOf(), accounts[3], "checkBalance");
+            return ico.withdraw();
+        }).then(function(withdraw) {
+            return web3.eth.getBalance(web3.eth.accounts[3]);
+        }).then(function(balanceAfter) {
+            assert.isBelow((12499*10**18 - balanceAfter.valueOf())/10**15, 500, "Balance after refund is wrong! (up)")
+            assert.isBelow((balanceAfter.valueOf() - 12499*10**18)/10**15, 500, "Balance after refund is wrong! (down)")
+        });
+    });
+
+
 
 });
 

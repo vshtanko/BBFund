@@ -1,27 +1,29 @@
 pragma solidity ^0.4.8;
 
-//TODO revert token buy
-
 contract PreIco {
 
-    mapping (address => uint) balances;
-    uint currentTokenSupply = 2500;
+    mapping (address => uint) public balances;
+    uint public currentTokenSupply = 2500;
     //TODO correct real tokenPrice
     uint tokenPrice = 1 ether;
-    bool isStopped = false;
+    bool public isStopped = false;
     uint timeCreated;
     uint preIcoDuration = 30 days;
-    address refundeeExcess;
-    uint refundAmountExcess;
-    address wallet;
+    address public excessRefundee;
+    uint public excessRefundeeAmount;
+    address public wallet;
     address admin;
 
     //Events
     event TokensBought(address buyer, uint tokens);
-    event Refund(address buyer, uint excess);
+    event Refund(address buyer, uint amount);
+    event ExcessRefund(address buyer, uint excess);
+    event Withdrawal(address wallet, uint amount);
+
 
     //Modifiers
     modifier isRunning() {
+        //TODO find out what happens when buyers send ether to stopped ICO
         require(!isStopped);
         _;
     }
@@ -33,20 +35,17 @@ contract PreIco {
 
     //Functions
 
-    //function PreIco(address _wallet) payable {
-    function PreIco() payable {
+    function PreIco(address _wallet) payable {
         timeCreated = now;
-        wallet = 0x6187F5AdEeDc56EA634001F14F52B0020a7bbAbd;
+        wallet = _wallet;
         admin = msg.sender;
     }
 
-    //TODO why doesn't work without tuple identifier
     function inTime() returns (bool) {
-        uint delta = now - timeCreated;
-        return delta < preIcoDuration;
+        return now - timeCreated < preIcoDuration;
     }
 
-    function buyTokens() isRunning payable  {
+    function buyTokens() isRunning payable {
         require(msg.value > 0);
 
         if (!inTime()) {
@@ -54,10 +53,9 @@ contract PreIco {
             return;
         }
 
-        uint buyAmount = msg.value * tokenPrice;
+        uint buyAmount = msg.value / tokenPrice;
 
         if (currentTokenSupply > buyAmount) {
-            wallet.transfer(msg.value);
             balances[msg.sender] = buyAmount;
             currentTokenSupply -= buyAmount;
             TokensBought(msg.sender, buyAmount);
@@ -66,24 +64,37 @@ contract PreIco {
             isStopped = true;
             balances[msg.sender] += currentTokenSupply;
             TokensBought(msg.sender, currentTokenSupply);
-            refundAmountExcess = (buyAmount - currentTokenSupply) * tokenPrice;
+            excessRefundee = msg.sender;
+            excessRefundeeAmount = (buyAmount - currentTokenSupply) * tokenPrice;
             currentTokenSupply = 0;
         }
     }
 
-    function refund(address refundee) {
+    function refund(address refundee) isAdmin {
         uint amount = balances[refundee] * tokenPrice;
         refundee.transfer(amount);
         balances[refundee] = 0;
-        Refund(msg.sender, amount);
+        Refund(refundee, amount);
     }
 
-    function stop() isAdmin {
+    function refundExcess() isAdmin {
+        balances[excessRefundee] = 0;
+        excessRefundee.transfer(excessRefundeeAmount);
+        ExcessRefund(excessRefundee, excessRefundeeAmount);
+    }
+
+    function pause() isAdmin {
         isStopped = true;
     }
 
     function run() isAdmin {
         isStopped = false;
+    }
+
+    function withdraw() isAdmin {
+        uint amount = this.balance;
+        wallet.transfer(this.balance);
+        Withdrawal(wallet, amount);
     }
 
 }
