@@ -1,58 +1,63 @@
 pragma solidity ^0.4.8;
 
-import "./MultiSig.sol";
+//TODO revert token buy
 
-contract PreIco is MultiSigWallet {
+contract PreIco {
 
     mapping (address => uint) balances;
     uint currentTokenSupply = 2500;
-    //TODO correct real price
-    uint priceInWei = 1*10**18;
+    //TODO correct real tokenPrice
+    uint tokenPrice = 1 ether;
     bool isStopped = false;
     uint timeCreated;
-    uint constant PreIcoDuration = 2592000; //30 days
-	
-	//Events
+    uint preIcoDuration = 30 days;
+    address refundeeExcess;
+    uint refundAmountExcess;
+    address wallet;
+    address admin;
+
+    //Events
     event TokensBought(address buyer, uint tokens);
-    event ReturnExcess(address buyer, uint excess);
+    event Refund(address buyer, uint excess);
 
     //Modifiers
     modifier isRunning() {
-        if (getTime() - timeCreated > PreIcoDuration) {
-            isStopped = true;
-        }
         require(!isStopped);
+        _;
+    }
+
+    modifier isAdmin() {
+        require(msg.sender == admin);
         _;
     }
 
     //Functions
 
-    function() payable {
-        revert();
+    //function PreIco(address _wallet) payable {
+    function PreIco() payable {
+        timeCreated = now;
+        wallet = 0x6187F5AdEeDc56EA634001F14F52B0020a7bbAbd;
+        admin = msg.sender;
     }
 
-    function PreIco(address[] _owners, uint _required) payable {
-        timeCreated = getTime();
-    }
-
-    function getTime() public returns (uint) {
-        return now;
-    }
-
-    function getCurrentTokenSupply() public returns (uint) {
-        return currentTokenSupply;
-    }
-
-    function getBalance() public returns (uint balance) {
-        return balances[msg.sender];
+    //TODO why doesn't work without tuple identifier
+    function inTime() returns (bool) {
+        uint delta = now - timeCreated;
+        return delta < preIcoDuration;
     }
 
     function buyTokens() isRunning payable  {
-        if (msg.value == 0) {
-            throw;
+        require(msg.value > 0);
+
+        if (!inTime()) {
+            isStopped = true;
+            return;
         }
-        uint buyAmount = msg.value / priceInWei;
+
+        uint buyAmount = msg.value * tokenPrice;
+
         if (currentTokenSupply > buyAmount) {
+            wallet.transfer(msg.value);
             balances[msg.sender] = buyAmount;
             currentTokenSupply -= buyAmount;
             TokensBought(msg.sender, buyAmount);
@@ -61,12 +66,24 @@ contract PreIco is MultiSigWallet {
             isStopped = true;
             balances[msg.sender] += currentTokenSupply;
             TokensBought(msg.sender, currentTokenSupply);
-            uint weiValueReturnExcess = (buyAmount - currentTokenSupply) * priceInWei;
+            refundAmountExcess = (buyAmount - currentTokenSupply) * tokenPrice;
             currentTokenSupply = 0;
-            msg.sender.transfer(weiValueReturnExcess);
-            ReturnExcess(msg.sender, weiValueReturnExcess);
-
         }
+    }
+
+    function refund(address refundee) {
+        uint amount = balances[refundee] * tokenPrice;
+        refundee.transfer(amount);
+        balances[refundee] = 0;
+        Refund(msg.sender, amount);
+    }
+
+    function stop() isAdmin {
+        isStopped = true;
+    }
+
+    function run() isAdmin {
+        isStopped = false;
     }
 
 }

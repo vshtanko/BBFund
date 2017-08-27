@@ -55,5 +55,17 @@ contract("PreIco test", function(accounts) {
     	});
     });
 
+    it("should have correct inTime() function", function() {
+        		var ico;
+        		return PreIco.deployed().then(function (instance) {
+        			ico = instance;
+        		return ico.getCurrentTokenSupply.call(accounts[0]);
+        	}).then(function(preBuyBalance) {
+        	    return ico.inTime.call();
+        	}).then(function(timeTrue) {
+        	    assert.equal(timeTrue.valueOf(), true, "Time isn't correct!");
+    });
+    });
+
 });
 
