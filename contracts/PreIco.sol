@@ -3,10 +3,11 @@ pragma solidity ^0.4.8;
 contract PreIco {
 
     mapping (address => uint) public balances;
-    uint public currentTokenSupply = 2500;
+    uint constant decimals = 1e18;
+    uint public currentTokenSupply = 2500 * decimals;
     //TODO correct real tokenPrice
-    uint tokenPrice = 1 ether;
-    bool public isStopped = false;
+    uint constant tokenPrice = 1;
+    bool public isPaused = false;
     uint timeCreated;
     uint preIcoDuration = 30 days;
     address public excessRefundee;
@@ -24,7 +25,9 @@ contract PreIco {
     //Modifiers
     modifier isRunning() {
         //TODO find out what happens when buyers send ether to stopped ICO
-        require(!isStopped);
+        require(now < timeCreated + preIcoDuration &&
+                currentTokenSupply > 0 &&
+                !isPaused);
         _;
     }
 
@@ -41,19 +44,10 @@ contract PreIco {
         admin = msg.sender;
     }
 
-    function inTime() returns (bool) {
-        return now - timeCreated < preIcoDuration;
-    }
-
     function buyTokens() isRunning payable {
-        require(msg.value > 0);
+        require(msg.value >= decimals * tokenPrice);
 
-        if (!inTime()) {
-            isStopped = true;
-            return;
-        }
-
-        uint buyAmount = msg.value / tokenPrice;
+        uint buyAmount = msg.value * tokenPrice;
 
         if (currentTokenSupply > buyAmount) {
             balances[msg.sender] = buyAmount;
@@ -61,7 +55,6 @@ contract PreIco {
             TokensBought(msg.sender, buyAmount);
         }
         else {
-            isStopped = true;
             balances[msg.sender] += currentTokenSupply;
             TokensBought(msg.sender, currentTokenSupply);
             excessRefundee = msg.sender;
@@ -84,11 +77,11 @@ contract PreIco {
     }
 
     function pause() isAdmin {
-        isStopped = true;
+        isPaused = true;
     }
 
     function run() isAdmin {
-        isStopped = false;
+        isPaused = false;
     }
 
     function withdraw() isAdmin {

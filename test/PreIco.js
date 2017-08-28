@@ -4,12 +4,12 @@ var accounts = web3.eth.accounts;
 contract("PreIco test", function(accounts) {
 
 
-	it("should have buy logic", function() {
+	it("should have coorect buy logic", function() {
 		return PreIco.deployed().then(function (instance) {
 			ico = instance;
 			return ico.currentTokenSupply.call(accounts[0]);
         }).then(function(supply) {
-            assert.equal(supply.valueOf(), 2500, "Supply isn't 2500!");
+            assert.equal(supply.valueOf(), 2500*1e18, "Supply isn't 2500!");
         });
         });
 
@@ -22,10 +22,10 @@ contract("PreIco test", function(accounts) {
         }).then(function(afterSending) {
             return ico.currentTokenSupply.call();
         }).then(function(supply) {
-            assert.equal(supply.valueOf(), 2499, "Supply after buy isn't 2499!");
+            assert.equal(supply.valueOf(), 2499*1e18, "Supply after buy isn't 2499!");
             return ico.balances.call(accounts[1]);
         }).then(function(buyer1Balance) {
-                    assert.equal(buyer1Balance.valueOf(), 1, "Amount after buy is not 1!");
+                    assert.equal(buyer1Balance.valueOf(), 1e18, "Amount after buy is not 1!");
         });
     });
 
@@ -36,7 +36,7 @@ contract("PreIco test", function(accounts) {
     	}).then(function(preBuyBalance) {
     	    return ico.currentTokenSupply.call();
     	}).then(function(preBuyBalance) {
-    	    assert.equal(preBuyBalance.valueOf(), 2499, "Supply after buy isn't 2499!");
+    	    assert.equal(preBuyBalance.valueOf(), 2499*1e18, "Supply after buy isn't 2499!");
     		return ico.buyTokens(
     		{from:accounts[2], to:ico.address, value: web3.toWei(3000, "ether")})
     	}).then(function(afterSending) {
@@ -45,7 +45,7 @@ contract("PreIco test", function(accounts) {
     	    assert.equal(supply.valueOf(), 0, "Supply after buy isn't 0!");
     	    return ico.balances.call(accounts[2]);
         }).then(function(buyer1Balance) {
-            assert.equal(buyer1Balance.valueOf(), 2499, "Balance after overbuy is not correct!");
+            assert.equal(buyer1Balance.valueOf(), 2499*1e18, "Balance after overbuy is not correct!");
             return ico.excessRefundee.call();
         }).then(function(excessRefundee) {
             assert.equal(excessRefundee.valueOf(), accounts[2], "Wrong refundee address!");
@@ -60,24 +60,24 @@ contract("PreIco test", function(accounts) {
                 ico = instance;
             return ico.pause();
         }).then(function(_) {
-            return ico.isStopped();
-        }).then(function(isStopped) {
-            assert.equal(isStopped.valueOf(), true, "Doesn't pause correctly");
+            return ico.isPaused();
+        }).then(function(isPaused) {
+            assert.equal(isPaused.valueOf(), true, "Doesn't pause correctly");
             return ico.buyTokens(
                 {from:accounts[1], to:ico.address, value: web3.toWei(1, "ether")})
         }).then(assert.fail)
             .catch(function(error) {
             return ico.run();
         }).then(function(_) {
-            return ico.isStopped();
-        }).then(function(isStopped) {
-            assert.equal(isStopped.valueOf(), false, "Doesn't run correctly");
+            return ico.isPaused();
+        }).then(function(isPaused) {
+            assert.equal(isPaused.valueOf(), false, "Doesn't run correctly");
             return ico.pause({from: accounts[1]});
         }).then(assert.fail)
         .catch(function(error) {
-            return ico.isStopped();
-        }).then(function(isStopped) {
-            assert.equal(isStopped.valueOf(), false, "Admin rights compromised");
+            return ico.isPaused();
+        }).then(function(isPaused) {
+            assert.equal(isPaused.valueOf(), false, "Admin rights compromised");
         });
     });
 
