@@ -1,10 +1,11 @@
-pragma solidity ^0.4.8;
+pragma solidity ^0.4.11;
 
 contract PreIco {
 
     mapping (address => uint) public balances;
     uint constant decimals = 1e18;
     uint public currentTokenSupply = 2500 * decimals;
+    uint constant minimalAmount = decimals * tokenPrice;
     //TODO correct real tokenPrice
     uint constant tokenPrice = 1;
     bool public isPaused = false;
@@ -19,7 +20,7 @@ contract PreIco {
     event TokensBought(address buyer, uint tokens);
     event Refund(address buyer, uint amount);
     event ExcessRefund(address buyer, uint excess);
-    event Withdrawal(address wallet, uint amount);
+    event Withdrawal(address withdrawalAddress, uint amount);
 
 
     //Modifiers
@@ -45,7 +46,7 @@ contract PreIco {
     }
 
     function buyTokens() isRunning payable {
-        require(msg.value >= decimals * tokenPrice);
+        require(msg.value >= minimalAmount);
 
         uint buyAmount = msg.value * tokenPrice;
 
