@@ -3,7 +3,7 @@ pragma solidity ^0.4.11;
 contract PreIco {
 
 
-    uint constant PREICO_DURATION = 30 days;
+    uint constant PREICO_DURATION = 90 days;
     //TODO correct real TOKEN_PRICE
     uint constant TOKEN_PRICE = 1;
     uint constant DECIMALS = 10**18;
@@ -50,6 +50,10 @@ contract PreIco {
         admin = msg.sender;
     }
 
+    function () payable {
+        buyTokens();
+    }
+
     function buyTokens() isRunning payable {
         require(msg.value >= MINIMAL_AMOUNT);
 
@@ -71,6 +75,7 @@ contract PreIco {
 
     function refund(address refundee) isAdmin {
         uint amount = balances[refundee] / TOKEN_PRICE;
+        currentTokenSupply += balances[refundee];
         refundee.transfer(amount);
         balances[refundee] = 0;
         Refund(refundee, amount);

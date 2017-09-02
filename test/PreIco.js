@@ -17,8 +17,7 @@ contract("PreIco test", function(accounts) {
             var ico;
             return PreIco.deployed().then(function (instance) {
                 ico = instance;
-            return ico.buyTokens(
-            {from:accounts[1], to:ico.address, value: web3.toWei(1, "ether")})
+            return web3.eth.sendTransaction({from: accounts[1], to: ico.address, value: web3.toWei(1, "ether")});
         }).then(function(afterSending) {
             return ico.currentTokenSupply.call();
         }).then(function(supply) {
